@@ -72,14 +72,14 @@ pub type FreeCallback = extern "C" fn(*mut libc::c_void);
 
 // wrapper for callbacks
 extern "C" fn event_callback(
-    c: sys::virStreamPtr,
+    _c: sys::virStreamPtr,
     flags: libc::c_int,
     opaque: *const libc::c_void,
 ) {
     let flags = flags as StreamFlags;
-    let shadow_self = unsafe { &mut *(opaque as *mut Stream) };
-    if let Some(callback) = &mut shadow_self.callback {
-        callback(&Stream::from_ptr(c), flags);
+    let shadow_self = unsafe { &*(opaque as *mut Stream) };
+    if let Some(callback) = &shadow_self.callback {
+        callback(&shadow_self, flags);
     }
 }
 
@@ -88,7 +88,7 @@ extern "C" fn event_free(_opaque: *mut libc::c_void) {}
 // #[derive(Debug)]
 pub struct Stream {
     ptr: Option<sys::virStreamPtr>,
-    callback: Option<Box<dyn FnMut(&Stream, StreamEventType)>>,
+    callback: Option<Box<dyn Fn(&Stream, StreamEventType)>>,
 }
 
 impl Drop for Stream {
@@ -182,7 +182,7 @@ impl Stream {
         usize::try_from(ret).map_err(|_| Error::new())
     }
 
-    pub fn event_add_callback<F: 'static + FnMut(&Stream, StreamEventType)>(
+    pub fn event_add_callback<F: 'static + Fn(&Stream, StreamEventType)>(
         &mut self,
         events: StreamEventType,
         cb: F,
